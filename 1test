@@ -1,12 +1,11 @@
 --[[
-    Teleport + Auto-Steal Script for Area12
+    Instant Right-Center Steal UI
     Place in: StarterPlayer > StarterPlayerScripts (LocalScript)
-    Or run via executor.
+    Or paste in executor.
 ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -14,110 +13,37 @@ local playerGui = player:WaitForChild("PlayerGui")
 --==================================================================
 -- CONFIG
 --==================================================================
-local TARGET_NAME = "\231\190\142\230\156\178\229\156\186\230\153\175" -- decoded area name
-local COLLECT_LOOPS = 30       -- how many collect passes after teleport
-local COLLECT_DELAY = 0.1      -- delay between passes
+local TARGET_NAME = "\231\190\142\230\156\178\229\156\186\230\153\175"
+local COLLECT_LOOPS = 30
+local COLLECT_DELAY = 0.1
 
 --==================================================================
--- DRAGGABLE UI HELPERS
+-- DESTROY OLD UI IF EXISTS
 --==================================================================
-local function makeDraggable(frame, dragArea)
-    dragArea = dragArea or frame
-    local dragging, dragInput, dragStart, startPos
-
-    dragArea.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-
-    dragArea.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement
-        or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and input == dragInput then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-end
-
-local function createButton(parent, text, color, yPos)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 36)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.BackgroundColor3 = color
-    btn.BorderSizePixel = 0
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 15
-    btn.Font = Enum.Font.GothamBold
-    btn.AutoButtonColor = true
-    btn.Parent = parent
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = btn
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Transparency = 0.7
-    stroke.Parent = btn
-
-    return btn
-end
+local old = playerGui:FindFirstChild("StealGui")
+if old then old:Destroy() end
 
 --==================================================================
--- BUILD UI
+-- CREATE UI
 --==================================================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "StealGui"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.DisplayOrder = 999
 screenGui.Parent = playerGui
 
--- Toggle button (small floating button)
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 55, 0, 55)
-toggleBtn.Position = UDim2.new(0, 20, 0.4, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-toggleBtn.Text = "🎯"
-toggleBtn.TextSize = 26
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.BorderSizePixel = 0
-toggleBtn.Parent = screenGui
-
-local toggleCorner = Instance.new("UICorner")
-toggleCorner.CornerRadius = UDim.new(1, 0)
-toggleCorner.Parent = toggleBtn
-
-local toggleStroke = Instance.new("UIStroke")
-toggleStroke.Color = Color3.fromRGB(0, 170, 255)
-toggleStroke.Thickness = 2
-toggleStroke.Parent = toggleBtn
-
--- Main panel
+-- Main panel — anchored to RIGHT-CENTER of screen
 local main = Instance.new("Frame")
-main.Size = UDim2.new(0, 220, 0, 260)
-main.Position = UDim2.new(0, 85, 0.4, 0)
+main.Name = "Main"
+main.Size = UDim2.new(0, 230, 0, 270)
+main.AnchorPoint = Vector2.new(1, 0.5)          -- anchor to right edge
+main.Position = UDim2.new(1, -20, 0.5, 0)       -- 20px from right, vertically centered
 main.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
 main.BorderSizePixel = 0
-main.Visible = false
+main.Visible = true                              -- always visible
+main.Active = true                               -- allow dragging
 main.Parent = screenGui
 
 local mainCorner = Instance.new("UICorner")
@@ -131,10 +57,10 @@ mainStroke.Parent = main
 
 -- Title bar
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 36)
+title.Size = UDim2.new(1, 0, 0, 38)
 title.BackgroundColor3 = Color3.fromRGB(0, 140, 220)
 title.BorderSizePixel = 0
-title.Text = "  ⚡ Area12 Steal Menu"
+title.Text = "  ⚡ Area12 Steal"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 16
 title.Font = Enum.Font.GothamBold
@@ -147,8 +73,8 @@ titleCorner.Parent = title
 
 -- Status label
 local status = Instance.new("TextLabel")
-status.Size = UDim2.new(1, -20, 0, 30)
-status.Position = UDim2.new(0, 10, 0, 42)
+status.Size = UDim2.new(1, -20, 0, 32)
+status.Position = UDim2.new(0, 10, 0, 46)
 status.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
 status.BorderSizePixel = 0
 status.Text = "Ready."
@@ -161,25 +87,71 @@ local statusCorner = Instance.new("UICorner")
 statusCorner.CornerRadius = UDim.new(0, 5)
 statusCorner.Parent = status
 
--- Buttons
-local teleportBtn = createButton(main, "📍 Teleport to Area12", Color3.fromRGB(0, 140, 220), 80)
-local stealBtn    = createButton(main, "💰 Steal Everything", Color3.fromRGB(220, 130, 0), 122)
-local comboBtn    = createButton(main, "🚀 Teleport + Steal", Color3.fromRGB(160, 40, 200), 164)
-local closeBtn    = createButton(main, "❌ Close", Color3.fromRGB(180, 40, 40), 206)
+-- Button builder
+local function createButton(text, color, yPos)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -20, 0, 38)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.BackgroundColor3 = color
+    btn.BorderSizePixel = 0
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 15
+    btn.Font = Enum.Font.GothamBold
+    btn.AutoButtonColor = true
+    btn.Parent = main
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = btn
+
+    local s = Instance.new("UIStroke")
+    s.Color = Color3.fromRGB(255, 255, 255)
+    s.Transparency = 0.7
+    s.Parent = btn
+
+    return btn
+end
+
+local teleportBtn = createButton("📍 Teleport to Area12", Color3.fromRGB(0, 140, 220), 88)
+local stealBtn    = createButton("💰 Steal Everything",   Color3.fromRGB(220, 130, 0), 132)
+local comboBtn    = createButton("🚀 Teleport + Steal",   Color3.fromRGB(160, 40, 200), 176)
+local closeBtn    = createButton("❌ Hide",               Color3.fromRGB(180, 40, 40), 220)
 
 --==================================================================
--- TOGGLE PANEL
+-- DRAG SUPPORT (drag title bar to move panel)
 --==================================================================
-toggleBtn.MouseButton1Click:Connect(function()
-    main.Visible = not main.Visible
-end)
-
-closeBtn.MouseButton1Click:Connect(function()
-    main.Visible = false
-end)
-
-makeDraggable(main, title)
-makeDraggable(toggleBtn)
+do
+    local dragging, dragInput, dragStart, startPos
+    title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = main.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local delta = input.Position - dragStart
+            main.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
 
 --==================================================================
 -- CORE LOGIC
@@ -203,7 +175,6 @@ local function getArea12()
     return area12
 end
 
--- Enable instant E (HoldDuration = 0) on all prompts in area
 local function enableInstantE()
     local area12 = getArea12()
     if not area12 then return end
@@ -212,11 +183,6 @@ local function enableInstantE()
             obj.HoldDuration = 0
         end
     end
-    area12.DescendantAdded:Connect(function(desc)
-        if desc:IsA("ProximityPrompt") then
-            desc.HoldDuration = 0
-        end
-    end)
 end
 
 local function teleportToArea12()
@@ -225,14 +191,12 @@ local function teleportToArea12()
         setStatus("❌ " .. err, Color3.fromRGB(255, 100, 100))
         return false
     end
-
     local char = player.Character
     if not char then
         setStatus("❌ No character", Color3.fromRGB(255, 100, 100))
         return false
     end
 
-    -- Find a part to land on
     local targetPart
     if area12:IsA("BasePart") then
         targetPart = area12
@@ -243,22 +207,20 @@ local function teleportToArea12()
     end
 
     if not targetPart then
-        setStatus("❌ No part to land on", Color3.fromRGB(255, 100, 100))
+        setStatus("❌ No part found", Color3.fromRGB(255, 100, 100))
         return false
     end
 
     char:PivotTo(CFrame.new(targetPart.Position + Vector3.new(0, 3, 0)))
-    setStatus("✅ Teleported to Area12", Color3.fromRGB(150, 255, 150))
+    setStatus("✅ Teleported!", Color3.fromRGB(150, 255, 150))
     return true
 end
 
--- Fire prompt (exploit executor) OR simulate (Studio)
 local function firePrompt(prompt)
     if fireproximityprompt then
         pcall(fireproximityprompt, prompt)
         return true
     end
-    -- Fallback for Studio / non-executor
     local ok = pcall(function()
         prompt:InputHoldBegin()
         task.wait(prompt.HoldDuration)
@@ -273,13 +235,10 @@ local function stealEverything()
         setStatus("❌ " .. err, Color3.fromRGB(255, 100, 100))
         return 0
     end
-
     local count = 0
     for _, obj in ipairs(area12:GetDescendants()) do
         if obj:IsA("ProximityPrompt") and obj.Enabled and obj.Parent then
-            if firePrompt(obj) then
-                count += 1
-            end
+            if firePrompt(obj) then count += 1 end
         end
     end
     setStatus(("💰 Fired %d prompts"):format(count), Color3.fromRGB(255, 220, 100))
@@ -306,11 +265,18 @@ comboBtn.MouseButton1Click:Connect(function()
         for i = 1, COLLECT_LOOPS do
             if not player.Character then break end
             stealEverything()
-            setStatus(("🚀 Stealing... %d/%d"):format(i, COLLECT_LOOPS), Color3.fromRGB(200, 160, 255))
+            setStatus(("🚀 Stealing %d/%d"):format(i, COLLECT_LOOPS), Color3.fromRGB(200, 160, 255))
             task.wait(COLLECT_DELAY)
         end
         setStatus("✅ Done!", Color3.fromRGB(150, 255, 150))
     end
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    main.Visible = false
+    -- Re-show after 1 second so you don't lose it
+    task.wait(1)
+    main.Visible = true
 end)
 
 --==================================================================
@@ -334,4 +300,4 @@ end)
 --==================================================================
 enableInstantE()
 setStatus("Loaded ✔", Color3.fromRGB(150, 255, 150))
-print("[StealGui] Loaded. RightShift = toggle menu.")
+print("[StealGui] Loaded — panel shown at right-center.")
