@@ -1,59 +1,61 @@
 --[[
-    Instant Right-Center Steal UI
-    Place in: StarterPlayer > StarterPlayerScripts (LocalScript)
-    Or paste in executor.
+    EXECUTOR SCRIPT — Area12 Teleport + Steal
+    Paste into your executor and execute.
+    UI appears instantly at right-center.
 ]]
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 
 --==================================================================
 -- CONFIG
 --==================================================================
-local TARGET_NAME = "\231\190\142\230\156\178\229\156\186\230\153\175"
-local COLLECT_LOOPS = 30
-local COLLECT_DELAY = 0.1
+local TARGET_NAME = "\231\190\142\230\156\178\229\156\186\230\153\175" -- 美本地图 (verify below)
+local COLLECT_LOOPS = 40
+local COLLECT_DELAY = 0.08
 
 --==================================================================
--- DESTROY OLD UI IF EXISTS
+-- DESTROY OLD UI
 --==================================================================
-local old = playerGui:FindFirstChild("StealGui")
-if old then old:Destroy() end
+for _, gui in ipairs(CoreGui:GetChildren()) do
+    if gui.Name == "StealGui" then gui:Destroy() end
+end
+pcall(function()
+    for _, gui in ipairs(player:WaitForChild("PlayerGui"):GetChildren()) do
+        if gui.Name == "StealGui" then gui:Destroy() end
+    end
+end)
 
 --==================================================================
--- CREATE UI
+-- CREATE UI (in CoreGui — works even if game hides PlayerGui)
 --==================================================================
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "StealGui"
 screenGui.ResetOnSpawn = false
 screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 999999
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.DisplayOrder = 999
-screenGui.Parent = playerGui
+screenGui.Parent = CoreGui
 
--- Main panel — anchored to RIGHT-CENTER of screen
+-- Main panel anchored to RIGHT-CENTER
 local main = Instance.new("Frame")
 main.Name = "Main"
-main.Size = UDim2.new(0, 230, 0, 270)
-main.AnchorPoint = Vector2.new(1, 0.5)          -- anchor to right edge
-main.Position = UDim2.new(1, -20, 0.5, 0)       -- 20px from right, vertically centered
+main.Size = UDim2.new(0, 230, 0, 280)
+main.AnchorPoint = Vector2.new(1, 0.5)
+main.Position = UDim2.new(1, -20, 0.5, 0)
 main.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
 main.BorderSizePixel = 0
-main.Visible = true                              -- always visible
-main.Active = true                               -- allow dragging
+main.Active = true
+main.Visible = true
 main.Parent = screenGui
 
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
-mainCorner.Parent = main
-
-local mainStroke = Instance.new("UIStroke")
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+local mainStroke = Instance.new("UIStroke", main)
 mainStroke.Color = Color3.fromRGB(0, 170, 255)
 mainStroke.Thickness = 2
-mainStroke.Parent = main
 
 -- Title bar
 local title = Instance.new("TextLabel")
@@ -66,10 +68,7 @@ title.TextSize = 16
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = main
-
-local titleCorner = Instance.new("UICorner")
-titleCorner.CornerRadius = UDim.new(0, 10)
-titleCorner.Parent = title
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 10)
 
 -- Status label
 local status = Instance.new("TextLabel")
@@ -82,44 +81,35 @@ status.TextColor3 = Color3.fromRGB(150, 255, 150)
 status.TextSize = 13
 status.Font = Enum.Font.Gotham
 status.Parent = main
-
-local statusCorner = Instance.new("UICorner")
-statusCorner.CornerRadius = UDim.new(0, 5)
-statusCorner.Parent = status
+Instance.new("UICorner", status).CornerRadius = UDim.new(0, 5)
 
 -- Button builder
-local function createButton(text, color, yPos)
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -20, 0, 38)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.BackgroundColor3 = color
-    btn.BorderSizePixel = 0
-    btn.Text = text
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 15
-    btn.Font = Enum.Font.GothamBold
-    btn.AutoButtonColor = true
-    btn.Parent = main
-
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 6)
-    c.Parent = btn
-
-    local s = Instance.new("UIStroke")
+local function makeBtn(text, color, y)
+    local b = Instance.new("TextButton")
+    b.Size = UDim2.new(1, -20, 0, 38)
+    b.Position = UDim2.new(0, 10, 0, y)
+    b.BackgroundColor3 = color
+    b.BorderSizePixel = 0
+    b.Text = text
+    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.TextSize = 15
+    b.Font = Enum.Font.GothamBold
+    b.AutoButtonColor = true
+    b.Parent = main
+    Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+    local s = Instance.new("UIStroke", b)
     s.Color = Color3.fromRGB(255, 255, 255)
     s.Transparency = 0.7
-    s.Parent = btn
-
-    return btn
+    return b
 end
 
-local teleportBtn = createButton("📍 Teleport to Area12", Color3.fromRGB(0, 140, 220), 88)
-local stealBtn    = createButton("💰 Steal Everything",   Color3.fromRGB(220, 130, 0), 132)
-local comboBtn    = createButton("🚀 Teleport + Steal",   Color3.fromRGB(160, 40, 200), 176)
-local closeBtn    = createButton("❌ Hide",               Color3.fromRGB(180, 40, 40), 220)
+local teleportBtn = makeBtn("📍 Teleport to Area12", Color3.fromRGB(0, 140, 220), 88)
+local stealBtn    = makeBtn("💰 Steal Everything",   Color3.fromRGB(220, 130, 0), 132)
+local comboBtn    = makeBtn("🚀 Teleport + Steal",   Color3.fromRGB(160, 40, 200), 176)
+local closeBtn    = makeBtn("❌ Hide",               Color3.fromRGB(180, 40, 40), 220)
 
 --==================================================================
--- DRAG SUPPORT (drag title bar to move panel)
+-- DRAG SUPPORT
 --==================================================================
 do
     local dragging, dragInput, dragStart, startPos
@@ -156,9 +146,9 @@ end
 --==================================================================
 -- CORE LOGIC
 --==================================================================
-local function setStatus(text, color)
-    status.Text = text
-    status.TextColor3 = color or Color3.fromRGB(150, 255, 150)
+local function setStatus(t, c)
+    status.Text = t
+    status.TextColor3 = c or Color3.fromRGB(150, 255, 150)
 end
 
 local function getArea12()
@@ -180,7 +170,7 @@ local function enableInstantE()
     if not area12 then return end
     for _, obj in ipairs(area12:GetDescendants()) do
         if obj:IsA("ProximityPrompt") then
-            obj.HoldDuration = 0
+            pcall(function() obj.HoldDuration = 0 end)
         end
     end
 end
@@ -196,6 +186,11 @@ local function teleportToArea12()
         setStatus("❌ No character", Color3.fromRGB(255, 100, 100))
         return false
     end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        setStatus("❌ No HRP", Color3.fromRGB(255, 100, 100))
+        return false
+    end
 
     local targetPart
     if area12:IsA("BasePart") then
@@ -207,26 +202,14 @@ local function teleportToArea12()
     end
 
     if not targetPart then
-        setStatus("❌ No part found", Color3.fromRGB(255, 100, 100))
+        setStatus("❌ No part to land on", Color3.fromRGB(255, 100, 100))
         return false
     end
 
     char:PivotTo(CFrame.new(targetPart.Position + Vector3.new(0, 3, 0)))
+    hrp.Velocity = Vector3.zero
     setStatus("✅ Teleported!", Color3.fromRGB(150, 255, 150))
     return true
-end
-
-local function firePrompt(prompt)
-    if fireproximityprompt then
-        pcall(fireproximityprompt, prompt)
-        return true
-    end
-    local ok = pcall(function()
-        prompt:InputHoldBegin()
-        task.wait(prompt.HoldDuration)
-        prompt:InputHoldEnd()
-    end)
-    return ok
 end
 
 local function stealEverything()
@@ -237,8 +220,9 @@ local function stealEverything()
     end
     local count = 0
     for _, obj in ipairs(area12:GetDescendants()) do
-        if obj:IsA("ProximityPrompt") and obj.Enabled and obj.Parent then
-            if firePrompt(obj) then count += 1 end
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            local ok = pcall(fireproximityprompt, obj)
+            if ok then count += 1 end
         end
     end
     setStatus(("💰 Fired %d prompts"):format(count), Color3.fromRGB(255, 220, 100))
@@ -274,7 +258,6 @@ end)
 
 closeBtn.MouseButton1Click:Connect(function()
     main.Visible = false
-    -- Re-show after 1 second so you don't lose it
     task.wait(1)
     main.Visible = true
 end)
@@ -299,5 +282,27 @@ end)
 -- INIT
 --==================================================================
 enableInstantE()
-setStatus("Loaded ✔", Color3.fromRGB(150, 255, 150))
-print("[StealGui] Loaded — panel shown at right-center.")
+
+-- Re-apply instant-E periodically in case prompts respawn
+task.spawn(function()
+    while task.wait(3) do
+        enableInstantE()
+    end
+end)
+
+-- Verify the area name and report back
+local area12, err = getArea12()
+if area12 then
+    setStatus("✅ Area12 found", Color3.fromRGB(150, 255, 150))
+    print("[StealGui] Area12 found:", area12:GetFullName())
+else
+    setStatus("❌ " .. err, Color3.fromRGB(255, 100, 100))
+    warn("[StealGui] " .. err)
+    -- Print workspace children so you can find the real name
+    print("[StealGui] Workspace children:")
+    for _, v in ipairs(workspace:GetChildren()) do
+        print("  -", v.Name)
+    end
+end
+
+print("[StealGui] Executor script loaded.")
